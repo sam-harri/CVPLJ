@@ -1,17 +1,16 @@
 import copy
-import numpy as np
 import cv2
-from glob import glob
 import os
 import argparse
 import json
+import ffmpeg
+# openpose setup
+from src import util
+from src.body import Body
 
 # video file processing setup
 # from: https://stackoverflow.com/a/61927951
-import argparse
 import subprocess
-import sys
-from pathlib import Path
 from typing import NamedTuple
 
 
@@ -22,24 +21,28 @@ class FFProbeResult(NamedTuple):
 
 
 def ffprobe(file_path) -> FFProbeResult:
-    command_array = ["ffprobe",
-                     "-v", "quiet",
-                     "-print_format", "json",
-                     "-show_format",
-                     "-show_streams",
-                     file_path]
-    result = subprocess.run(command_array, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-    return FFProbeResult(return_code=result.returncode,
-                         json=result.stdout,
-                         error=result.stderr)
+    command_array = [
+        "ffprobe",
+        "-v",
+        "quiet",
+        "-print_format",
+        "json",
+        "-show_format",
+        "-show_streams",
+        file_path,
+    ]
+    result = subprocess.run(
+        command_array,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        universal_newlines=True,
+    )
+    return FFProbeResult(
+        return_code=result.returncode, json=result.stdout, error=result.stderr
+    )
 
+body_estimation = Body("model/body_pose_model.pth")
 
-# openpose setup
-from src import model
-from src import util
-from src.body import Body
-
-body_estimation = Body('model/body_pose_model.pth')
 
 def process_frame(frame, body=True, hands=True):
     canvas = copy.deepcopy(frame)
@@ -48,16 +51,17 @@ def process_frame(frame, body=True, hands=True):
         canvas = util.draw_bodypose(canvas, candidate, subset)
     return canvas
 
+
 # writing video with ffmpeg because cv2 writer failed
 # https://stackoverflow.com/questions/61036822/opencv-videowriter-produces-cant-find-starting-number-error
-import ffmpeg
 
 # open specified video
 parser = argparse.ArgumentParser(
-        description="Process a video annotating poses detected.")
-parser.add_argument('file', type=str, help='Video file location to process.')
-parser.add_argument('--no_hands', action='store_true', help='No hand pose')
-parser.add_argument('--no_body', action='store_true', help='No body pose')
+    description="Process a video annotating poses detected."
+)
+parser.add_argument("file", type=str, help="Video file location to process.")
+parser.add_argument("--no_hands", action="store_true", help="No hand pose")
+parser.add_argument("--no_body", action="store_true", help="No body pose")
 args = parser.parse_args()
 video_file = args.file
 cap = cv2.VideoCapture(video_file)
@@ -73,21 +77,23 @@ input_vcodec = videoinfo["codec_name"]
 
 # define a writer object to write to a movidified file
 postfix = info["format"]["format_name"].split(",")[0]
-output_file = ".".join(video_file.split(".")[:-1])+".processed." + postfix
+output_file = ".".join(video_file.split(".")[:-1]) + ".processed." + postfix
 
 
-class Writer():
-    def __init__(self, output_file, input_fps, input_framesize, input_pix_fmt,
-                 input_vcodec):
+class Writer:
+    def __init__(
+        self, output_file, input_fps, input_framesize, input_pix_fmt, input_vcodec
+    ):
         if os.path.exists(output_file):
             os.remove(output_file)
         self.ff_proc = (
-            ffmpeg
-            .input('pipe:',
-                   format='rawvideo',
-                   pix_fmt="bgr24",
-                   s='%sx%s'%(input_framesize[1],input_framesize[0]),
-                   r=input_fps)
+            ffmpeg.input(
+                "pipe:",
+                format="rawvideo",
+                pix_fmt="bgr24",
+                s="%sx%s" % (input_framesize[1], input_framesize[0]),
+                r=input_fps,
+            )
             .output(output_file, pix_fmt=input_pix_fmt, vcodec=input_vcodec)
             .overwrite_output()
             .run_async(pipe_stdin=True)
@@ -102,25 +108,25 @@ class Writer():
 
 
 writer = None
-while(cap.isOpened()):
+while cap.isOpened():
     ret, frame = cap.read()
     if frame is None:
         break
 
-    posed_frame = process_frame(frame, body=not args.no_body,
-                                       hands=not args.no_hands)
+    posed_frame = process_frame(frame, body=not args.no_body, hands=not args.no_hands)
 
     if writer is None:
         input_framesize = posed_frame.shape[:2]
-        writer = Writer(output_file, input_fps, input_framesize, input_pix_fmt,
-                        input_vcodec)
+        writer = Writer(
+            output_file, input_fps, input_framesize, input_pix_fmt, input_vcodec
+        )
 
-    cv2.imshow('frame', posed_frame)
+    cv2.imshow("frame", posed_frame)
 
     # write the frame
     writer(posed_frame)
 
-    if cv2.waitKey(1) & 0xFF == ord('q'):
+    if cv2.waitKey(1) & 0xFF == ord("q"):
         break
 
 cap.release()

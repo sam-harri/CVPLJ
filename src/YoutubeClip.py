@@ -1,8 +1,8 @@
 import os
-import pytube.exceptions
 from pytube import YouTube
 from moviepy.editor import VideoFileClip
 from tqdm import tqdm
+
 
 class YoutubeClip:
     """
@@ -35,7 +35,10 @@ class YoutubeClip:
     _process_video():
         Processes the video by downloading and trimming as specified.
     """
-    def __init__(self, url, start_time=None, end_time=None, framerate=None, path='videos/'):
+
+    def __init__(
+        self, url, start_time=None, end_time=None, framerate=None, path="videos/"
+    ):
         self.url = url
         self.start_time = start_time
         self.end_time = end_time
@@ -56,10 +59,15 @@ class YoutubeClip:
         """Downloads the video from YouTube with a progress bar."""
         try:
             yt = YouTube(self.url, on_progress_callback=self.show_progress_bar)
-            video = yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc().first()
+            video = (
+                yt.streams.filter(progressive=True, file_extension="mp4")
+                .order_by("resolution")
+                .desc()
+                .first()
+            )
             if not os.path.exists(self.path):
                 os.makedirs(self.path)
-            self.video_name = video.default_filename.replace(' ', '-')
+            self.video_name = video.default_filename.replace(" ", "-")
             self.pbar = tqdm(total=100, desc="Downloading", unit="%")
             video.download(output_path=self.path, filename=self.video_name)
             self.pbar.close()
@@ -79,7 +87,7 @@ class YoutubeClip:
             video_clip = video_clip.subclip(self.start_time, self.end_time)
         if self.framerate:
             video_clip = video_clip.set_fps(self.framerate)
-        video_clip.write_videofile(output_path, codec='libx264')
+        video_clip.write_videofile(output_path, codec="libx264")
         video_clip.close()
         os.remove(input_path)
 
