@@ -6,9 +6,9 @@ from src import util
 from src.body import Body
 import math
 
-body_estimation = Body("model/body_pose_model.pth")
+body_estimation = Body("model/body_pose_model.pt")
 
-test_image = "images/Screenshot 2024-04-17 181917.png"
+test_image = "datasets/Computer-Vision-Powerlifting-1/test/images/57_jpg.rf.c8c82b73f004f8a990351c84fcb6b17e.jpg"
 oriImg = cv2.imread(test_image)
 candidate, subset = body_estimation(oriImg)
 
